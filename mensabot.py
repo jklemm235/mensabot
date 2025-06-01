@@ -1,9 +1,10 @@
-import mensascraping as scraper
 import os
 import time
-import requests
-import json
 from typing import Optional
+
+import requests
+
+import mensascraping as scraper
 
 # # --- Handler help message ---
 def help_message(message) -> str:

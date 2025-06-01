@@ -1,3 +1,7 @@
+from typing import Dict, List
+from bs4 import BeautifulSoup
+import requests
+
 
 # URL/PATH related variables
 BASE_URL = "https://www.stwhh.de/speiseplan"
@@ -9,13 +13,6 @@ RELEVANT_PRICE_TYPES = [
     "Bedienstete",
     "Gäste",
 ]
-
-from typing import Dict, List
-from bs4 import BeautifulSoup
-import requests
-
-# telegram bot imports
-
 
 def scrape_food_by_location(html_content: str, target_location_id: str) -> List[dict]:
     """
