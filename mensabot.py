@@ -12,7 +12,7 @@ def help_message(message) -> str:
         "Welcome to MensaBot! Here are the commands you can use:\n" +\
         "/help - Show this help message\n" +\
         "/locations - Get a list of Mensa locations and their ids\n" +\
-        "/food <location-id> [today|next_day] - Get the food menu for a given location. " +\
+        "/food <location-id> [today|tomorrow] - Get the food menu for a given location. " +\
         "Timepoint defaults to 'today' if not specified."
         # Add more commands as needed
     return help_text
@@ -49,7 +49,7 @@ def food_message(message) -> str:
     """
     split_message = message.split()
     if len(split_message) < 2 or len(split_message) > 3 or split_message[0] != "/food":
-        return "Usage: /food <location-id> [today|next_day]. " +\
+        return "Usage: /food <location-id> [today|tomorrow]. " +\
                "Timepoint defaults to 'today' if not specified."
 
     location_id = split_message[1]
@@ -57,8 +57,8 @@ def food_message(message) -> str:
     if len(split_message) > 2:
         # If a second argument is provided, use it as the timepoint
         timepoint_str = split_message[2].lower() # Convert to lowercase for easier comparison
-        if timepoint_str not in ["today", "next_day"]:
-            return "Invalid timepoint. Please use 'today' or 'next_day'."
+        if timepoint_str not in ["today", "tomorrow"]:
+            return "Invalid timepoint. Please use 'today' or 'tomorrow'."
 
     # --- Call your scraper function with location_id and target_date ---
     try:
@@ -78,7 +78,7 @@ def food_message(message) -> str:
     # Format the food items into a message
     food_message = f"Food items for location ID {location_id} on {timepoint_str}:\n"
     for item in food_items:
-        food_message += f"- {item['name']} ({item['category']}): {item['prices']} on {item['date']}\n"
+        food_message += f"- {item['name']} ({item['category']}): {item['prices']} on {item['date']}\n\n"
     # Send the message with the food items
     return food_message
 
@@ -97,7 +97,6 @@ def send_message(token: str, chat_id: int, text: str) -> None:
     payload = {
         "chat_id": chat_id,
         "text": text,
-        "parse_mode": "Markdown"  # Use Markdown for formatting
     }
     print(f"Sending message to chat {chat_id}: {text}")
     response = requests.post(url, json=payload)
@@ -113,7 +112,7 @@ def main() -> None:
 
     last_handled_id = None
     while True:
-        time.sleep(3) #TODFO: make it 10
+        time.sleep(10)
         try:
             # Poll for updates
             updates = poll_updates(BOT_TOKEN, last_handled_id)

@@ -120,6 +120,8 @@ def get_all_location_names_and_ids(html_content: str) -> Dict[str, str]:
 
 def get_html_by_day(t_query_param="today") -> requests.Response:
     url = BASE_URL
+    if t_query_param == "tomorrow":
+        t_query_param = "next_day"
     if t_query_param in QUERY_PARAMS['t']:
         url += f"?t={t_query_param}"
     else:
