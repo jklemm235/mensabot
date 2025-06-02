@@ -68,6 +68,18 @@ def food_message(message) -> str:
     except Exception as e:
         return f"Error fetching the html: {e}"
 
+
+    # get the location names from the html
+    location_name = location_id
+    try:
+        all_locations = scraper.get_all_location_names_and_ids(html.text)
+        for key, value in all_locations.items():
+            if value == location_id:
+                location_name = key
+                break
+    except Exception as e:
+        return f"Error extracting location names: {e}"
+
     try:
         food_items = scraper.scrape_food_by_location(html.text, location_id)
     except Exception as e:
@@ -77,7 +89,7 @@ def food_message(message) -> str:
         return f"No food items found for location ID {location_id} on {timepoint_str}."
 
     # Format the food items into a message
-    food_message = f"Food items for location ID {location_id} on {timepoint_str}:\n"
+    food_message = f"Food items for {location_name} ({location_id}):\n"
     for item in food_items:
         food_message += f"- {item['name']} ({item['category']}): {item['prices']} on {item['date']}\n\n"
     # Send the message with the food items
@@ -150,6 +162,9 @@ def main() -> None:
                     send_message(BOT_TOKEN, chat_id, response)
                 elif message_text.startswith("/food"):
                     response = food_message(message_text)
+                    send_message(BOT_TOKEN, chat_id, response)
+                else:
+                    response = "Unknown command. Please use /help to see available commands."
                     send_message(BOT_TOKEN, chat_id, response)
             except Exception as e:
                 print(f"Error handling update {update_id}: {e}")

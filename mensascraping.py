@@ -89,8 +89,7 @@ def get_all_location_names_and_ids(html_content: str) -> Dict[str, str]:
         html_content (str): The HTML content containing location names.
 
     Returns:
-        list[str]: A list of all unique location names found in the HTML.
-                   Returns an empty list if no location names are found.
+        Dict[str, str]: location names as keys and their corresponding IDs as values.
     """
     soup = BeautifulSoup(html_content, 'lxml')
     location_names = {}
