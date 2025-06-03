@@ -6,7 +6,7 @@ import mensabot as bot
 def send_food_message(chat_id: int, location_id: str, token: str):
     """Sends a food message to the specified chat."""
     try:
-        food_message = bot.food_message(f"\\food {location_id} today")
+        food_message = bot.food_message(f"/food {location_id} today")
         bot.send_message(token, chat_id, food_message)
     except Exception as e:
         print(f"Error sending food message: {e}")
