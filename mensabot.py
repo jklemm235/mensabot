@@ -1,6 +1,7 @@
 import os
 import time
 from typing import Optional
+import random
 
 import requests
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -8,6 +9,15 @@ from apscheduler.schedulers.background import BackgroundScheduler
 import mensascraping as scraper
 import schedulerLogic as sched
 import schedulerDB as schedDB
+
+OLE_MESSAGES = [
+    "How is Otel going Ole?",
+    "Ole, are you still working on Otel?",
+    "Ole, I hope you're not too busy with Otel to enjoy some Mensa food!",
+    "Ole, remember to take breaks and enjoy some Mensa food while working on Otel!",
+    "Sometimes I dream about Otel",
+    "I think Ole might actually not be working on Otel :("
+]
 
 # # --- Handler help message ---
 def help_message(message) -> str:
@@ -46,6 +56,9 @@ def locations_message(message) -> str:
     return location_text
 
 # --- Handler food message ---
+
+def _get_food_message_for_location_id(location_id: str, timepoint_str: str) -> str:
+
 def food_message(message) -> str:
     """
     Receives /food <location-id> [timepoint] and sends the menu.
@@ -96,6 +109,55 @@ def food_message(message) -> str:
     for item in food_items:
         food_message += f"- {item['name']} ({item['category']}): {item['prices']} on {item['date']}\n\n"
     # Send the message with the food items
+
+    # if the location name is Blattwerk, also report Philturm and leave a cheeky remark for Simon
+    if "blattwerk" in location_name.lower():
+        philturm_location_id = None
+        philturm_location_name = None
+        for location in all_locations:
+            if "philturm" in location.lower():
+                philturm_location_id = all_locations[location]
+                philturm_location_name = location
+                break
+        if not philturm_location_id or not philturm_location_name:
+            food_message += "\nP.S. Help, I couldn't find the Philturm location ID! "
+            return food_message
+
+        food_message += "\nP.S. Simon, here's the vastly superior Philturm menu as well! 😉"
+        try:
+            philturm_food_items = scraper.scrape_food_by_location(html.text, philturm_location_id)
+            food_message += f"\nFood items for {philturm_location_name} ({philturm_location_id}):\n"
+            for item in philturm_food_items:
+                food_message += f"- {item['name']} ({item['category']}): {item['prices']} on {item['date']}\n\n"
+        except Exception as e:
+            food_message += f"Error extracting Philturm food items: {e}"
+
+    # If asking for philturm, also report Blattwerk
+    if "philturm" in location_name.lower():
+        blattwerk_location_id = None
+        blattwerk_location_name = None
+        for location in all_locations:
+            if "blattwerk" in location.lower():
+                blattwerk_location_id = all_locations[location]
+                blattwerk_location_name = location
+                break
+        if not blattwerk_location_id or not blattwerk_location_name:
+            food_message += "\nP.S. Help, I couldn't find the Blattwerk location ID! "
+            return food_message
+
+        food_message += "\nI quess the inferior Blattwerk menu is also requested?"
+        try:
+            blattwerk_food_items = scraper.scrape_food_by_location(html.text, blattwerk_location_id)
+            food_message += f"\nFood items for {blattwerk_location_name} ({blattwerk_location_id}):\n"
+            for item in blattwerk_food_items:
+                food_message += f"- {item['name']} ({item['category']}): {item['prices']} on {item['date']}\n\n"
+        except Exception as e:
+            food_message += f"Error extracting Blattwerk food items: {e}"
+
+    # with 10% probability, add a random Ole message
+    if random.random() <= 0.1:
+        food_message += "\n\n" + random.choice(OLE_MESSAGES)
+
     return food_message
 
 # --- subscribe message ---
