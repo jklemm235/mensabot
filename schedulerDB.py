@@ -1,6 +1,6 @@
 import sqlite3
 import os
-from typing import Set
+from typing import FrozenSet, Set, Tuple
 
 DB_FILE = 'mensabot.db'
 
@@ -41,7 +41,7 @@ def remove_schedule_from_db(chat_id: str, location_id: str,
     finally:
         cursor.close()
 
-def retrieve_schedules() -> Set[dict]:
+def retrieve_schedules() -> Set[Tuple[str, str, str, str]]:
     """Retrieve all schedules from the database."""
     try:
         conn = create_connection(DB_FILE)
@@ -50,14 +50,10 @@ def retrieve_schedules() -> Set[dict]:
         rows = cursor.fetchall()
         schedules = []
         for row in rows:
-            schedule = {
-                'chat_id': row[1],
-                'location_id': row[2],
-                'time': row[3],
-                'days_of_week': row[4]
-            }
-            schedules.append(schedule)
-        return set(schedules)
+            schedule = (row[1], row[2], row[3], row[4])
+              # chat_id, location_id, time, days_of_week
+            schedules.append(schedule)  # Convert to frozenset for immutability
+        return set(schedules)  # Return as a set for uniqueness
     except sqlite3.Error as e:
         print(f"An error occurred while retrieving schedules: {e}")
         return set()
@@ -74,7 +70,7 @@ def create_table(conn: sqlite3.Connection):
                 chat_id TEXT NOT NULL,
                 location_id TEXT NOT NULL,
                 time TEXT DEFAULT '10:00',
-                days_of_week TEXT NOT NULL DEFAULT 'mon-fri',
+                days_of_week TEXT NOT NULL DEFAULT 'mon-fri'
             )
         ''')
         conn.commit()

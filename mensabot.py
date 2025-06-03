@@ -27,7 +27,13 @@ def help_message(message) -> str:
         "/help - Show this help message\n" +\
         "/locations - Get a list of Mensa locations and their ids\n" +\
         "/food <location-id> [today|tomorrow] - Get the food menu for a given location. " +\
-        "Timepoint defaults to 'today' if not specified."
+        "Timepoint defaults to 'today' if not specified.\n" +\
+        "/subscribe <location-id> <cron-days-of-week> <hh:mm> - Subscribe to receive daily food updates " +\
+        "for a specific location at a specific time. " +\
+        "cron-days-of-week is a string of the form 'mon-fri' or 'mon,tue,wed,thu,fri'...\n" +\
+        "/unsubscribe <location-id> <cron-days-of-week> <hh:mm> - Unsubscribe from daily food updates " +\
+        "for a specific location at a specific time.\n" +\
+        "Note: The bot will send you messages at the specified time on the specified days of the week."
         # Add more commands as needed
     return help_text
 
@@ -56,9 +62,6 @@ def locations_message(message) -> str:
     return location_text
 
 # --- Handler food message ---
-
-def _get_food_message_for_location_id(location_id: str, timepoint_str: str) -> str:
-
 def food_message(message) -> str:
     """
     Receives /food <location-id> [timepoint] and sends the menu.
@@ -196,6 +199,10 @@ def handle_subscribe_message(message, scheduler_instance, chat_id, token) -> Non
     except Exception as e:
         send_message(token, chat_id, f"Error saving subscription to database: {e}")
         return
+    send_message(token=token,
+                    chat_id=chat_id,
+                    text=f"Subscribed to location {location_id} on {split_message[2]} at {split_message[3]}. " +\
+                        "You will receive food updates at that time.")
 
 def handle_unsubscribe_message(message, scheduler_instance, chat_id, token) -> BackgroundScheduler:
     """

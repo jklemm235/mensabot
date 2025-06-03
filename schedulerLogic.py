@@ -35,10 +35,11 @@ def startup_scheduler(token: str):
     scheduler = BackgroundScheduler()
     schedules = schedDB.retrieve_schedules()
     for schedule_item in schedules:
-        chat_id = schedule_item['chat_id']
-        location_id = schedule_item['location_id']
-        time_str = schedule_item['time']
-        days_of_week = schedule_item['days_of_week']
+        chat_id = schedule_item[0]  # chat_id
+        location_id = schedule_item[1]
+        time_str = schedule_item[2]
+        days_of_week = schedule_item[3]
+        print(f"Setting up job for chat_id: {chat_id}, location_id: {location_id}, time: {time_str}, days: {days_of_week}")
         set_cron_like_job(scheduler_instance=scheduler,
                           chat_id=chat_id,
                           location_id=location_id,
