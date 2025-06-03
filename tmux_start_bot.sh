@@ -1,2 +1,2 @@
 #!/bin/sh
-tmux new -d -s mensabot_session 'start_bot.sh'
+tmux new -s mensabot_session 'bash start_bot.sh'
