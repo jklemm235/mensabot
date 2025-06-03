@@ -3,8 +3,11 @@ import time
 from typing import Optional
 
 import requests
+from apscheduler.schedulers.background import BackgroundScheduler
 
 import mensascraping as scraper
+import schedulerLogic as sched
+import schedulerDB as schedDB
 
 # # --- Handler help message ---
 def help_message(message) -> str:
@@ -95,6 +98,75 @@ def food_message(message) -> str:
     # Send the message with the food items
     return food_message
 
+# --- subscribe message ---
+def handle_subscribe_message(message, scheduler_instance, chat_id, token) -> None:
+    """
+    Receives /subscribe <location-id> <cron-days-of-week> <hh:mm> and schedules cron-days-of-week
+    times messages at hh:mm.
+    cron-days-of-week is a string of the form "mon-fri" or "mon,tue,wed,thu,fri"...
+    """
+    split_message = message.split()
+    if len(split_message) != 4:
+        send_message(token=token,
+                     chat_id=chat_id,
+                     text="Usage: /subscribe <location-id> <cron-days-of-week> <hh:mm> " +\
+               "E.g. /subscribe 176 mon-fri 10:00 " +\
+                "or /subscribe 176 mon,tue,wed,fri 10:00")
+        return
+
+    location_id = split_message[1]
+    try:
+        sched.set_cron_like_job(scheduler_instance=scheduler_instance,
+                               chat_id=chat_id,
+                               location_id=location_id,
+                               token=token,
+                               time_str=split_message[3],
+                               days_of_week=split_message[2])
+    except Exception as e:
+        send_message(token, chat_id, f"Error setting up subscription: {e}")
+        return
+    # persist the schedule in the database
+    try:
+        schedDB.add_schedule_to_db(chat_id=str(chat_id),
+                                   location_id=location_id,
+                                   time_str=split_message[3],
+                                   days_of_week=split_message[2])
+    except Exception as e:
+        send_message(token, chat_id, f"Error saving subscription to database: {e}")
+        return
+
+def handle_unsubscribe_message(message, scheduler_instance, chat_id, token) -> BackgroundScheduler:
+    """
+    Receives /unsubscribe <location-id> <cron-days-of-week> <hh:mm>
+    and removes the subscription for that location.
+    """
+    split_message = message.split()
+    if len(split_message) != 4:
+        send_message(token=token,
+                     chat_id=chat_id,
+                     text="Usage: /unsubscribe <location-id> <cron-days-of-week> <hh:mm> " +\
+               "E.g. /unsubscribe 176 mon-fri 10:00 " +\
+                "or /unsubscribe 176 mon,tue,wed,fri 10:00")
+        return scheduler_instance
+
+    # remove the job from the database
+    try:
+        schedDB.remove_schedule_from_db(chat_id=str(chat_id),
+                                       location_id=split_message[1],
+                                       time_str=split_message[3],
+                                       days_of_week=split_message[2])
+    except Exception as e:
+        send_message(token, chat_id, f"Error removing subscription from database: {e}")
+        return scheduler_instance
+
+    # now we just restart the scheduler.  Not clean but works
+    scheduler_instance.shutdown(wait=False)  # Stop the scheduler
+    scheduler_instance = sched.startup_scheduler(token)  # Restart the scheduler
+    send_message(token=token,
+                 chat_id=chat_id,
+                 text=f"Unsubscribed from location {split_message[1]} on {split_message[2]} at {split_message[3]}.")
+    return scheduler_instance
+
 # telegram library sucks so we just call the API directly
 def poll_updates(token: str, last_handled_id: Optional[int]) -> dict:
     """Polls updates from the Telegram Bot API."""
@@ -116,14 +188,17 @@ def send_message(token: str, chat_id: int, text: str) -> None:
     if response.status_code != 200:
         raise Exception(f"Failed to send message: {response.text}")
 
+
+
 # --- Main function to set up and run the bot ---
 def main() -> None:
     """Starts the bot."""
     BOT_TOKEN = os.getenv("MENSABOT_TOKEN")
     if not BOT_TOKEN:
         raise ValueError("Please set your bot token in the MENSABOT_TOKEN environment variable.")
-
     last_handled_id = None
+
+    scheduler_instance = sched.startup_scheduler(BOT_TOKEN)  # Start the scheduler
     while True:
         time.sleep(10)
         try:
@@ -163,6 +238,10 @@ def main() -> None:
                 elif message_text.startswith("/food"):
                     response = food_message(message_text)
                     send_message(BOT_TOKEN, chat_id, response)
+                elif message_text.startswith("/subscribe"):
+                    handle_subscribe_message(message_text, scheduler_instance, chat_id, BOT_TOKEN)
+                elif message_text.startswith("/unsubscribe"):
+                    scheduler_instance = handle_unsubscribe_message(message_text, scheduler_instance, chat_id, BOT_TOKEN)
                 else:
                     response = "Unknown command. Please use /help to see available commands."
                     send_message(BOT_TOKEN, chat_id, response)

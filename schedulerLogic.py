@@ -1,0 +1,51 @@
+from apscheduler.schedulers.background import BackgroundScheduler
+
+import schedulerDB as schedDB
+import mensabot as bot
+
+def send_food_message(chat_id: int, location_id: str, token: str):
+    """Sends a food message to the specified chat."""
+    try:
+        food_message = bot.food_message(f"\\food {location_id} today")
+        bot.send_message(token, chat_id, food_message)
+    except Exception as e:
+        print(f"Error sending food message: {e}")
+
+def set_cron_like_job(scheduler_instance: BackgroundScheduler, chat_id: str, location_id: str,
+                      token: str, time_str: str = "10:00", days_of_week: str = 'mon-fri'):
+    """Sets up a recurring 'cron-like' job."""
+    # Set up daily messages from mo to fr at the specified time
+    if not time_str or ':' not in time_str:
+        print(f"Invalid time format: {time_str}. Expected format is HH:MM.")
+        return
+    scheduler_instance.add_job(send_food_message,
+        'cron',
+        day_of_week=days_of_week,
+        hour=int(time_str.split(':')[0]),
+        minute=int(time_str.split(':')[1]),
+        args=[int(chat_id), location_id, token]
+    )
+
+
+def startup_scheduler(token: str):
+    """
+    Initializes the scheduler, reading from the database and setting the relevant jobs.
+    Should be called at the start of the bot, not multiple times or we spam
+    """
+    scheduler = BackgroundScheduler()
+    schedules = schedDB.retrieve_schedules()
+    for schedule_item in schedules:
+        chat_id = schedule_item['chat_id']
+        location_id = schedule_item['location_id']
+        time_str = schedule_item['time']
+        days_of_week = schedule_item['days_of_week']
+        set_cron_like_job(scheduler_instance=scheduler,
+                          chat_id=chat_id,
+                          location_id=location_id,
+                          token=token,
+                          time_str=time_str,
+                          days_of_week=days_of_week)
+
+    # Start the scheduler process
+    scheduler.start()
+    return scheduler
