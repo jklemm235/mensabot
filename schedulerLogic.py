@@ -15,9 +15,14 @@ def set_cron_like_job(scheduler_instance: BackgroundScheduler, chat_id: str, loc
                       token: str, time_str: str = "10:00", days_of_week: str = 'mon-fri'):
     """Sets up a recurring 'cron-like' job."""
     # Set up daily messages from mo to fr at the specified time
-    if not time_str or ':' not in time_str:
-        print(f"Invalid time format: {time_str}. Expected format is HH:MM.")
-        return
+    if not time_str:
+        raise ValueError("Time string cannot be empty.")
+    time_str_split = time_str.split(':')
+    if len(time_str_split) != 2 or not all(part.isdigit() for part in time_str_split) or \
+       not (0 <= int(time_str_split[0]) < 24) or not (0 <= int(time_str_split[1]) < 60) or \
+       len(time_str_split[0]) != 2 or len(time_str_split[1]) != 2:
+        raise ValueError("Time string must be in the format 'HH:MM' with valid hour and minute values.")
+
     scheduler_instance.add_job(send_food_message,
         'cron',
         day_of_week=days_of_week,
