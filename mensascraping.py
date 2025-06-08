@@ -1,6 +1,7 @@
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from bs4 import BeautifulSoup
 import requests
+import editdistance
 
 
 # URL/PATH related variables
@@ -115,6 +116,9 @@ def get_all_location_names_and_ids(html_content: str) -> Dict[str, str]:
 
 
 def get_html_by_day(t_query_param="today") -> requests.Response:
+    """
+    Gets the HTML content for the specified day from the STW HH website.
+    """
     url = BASE_URL
     if t_query_param == "tomorrow":
         t_query_param = "next_day"
@@ -127,6 +131,46 @@ def get_html_by_day(t_query_param="today") -> requests.Response:
         return response
     else:
         raise Exception(f"Failed to fetch data from {url}, status code: {response.status_code}")
+
+
+def get_closest_locations_by_pattern(pattern: str, locations: Dict[str, str]) -> \
+    Tuple[Dict[str, str], int]:
+    """
+    Returns a dictionary of location names and their IDs with the lowest edit distance
+    to the given pattern. Also returns the edit distance
+
+    Args:
+        pattern (str): The pattern to match against location names.
+        locations (Dict[str, str]): A dictionary of location names and their IDs.
+            (keys are names, values are IDs)
+    Returns:
+        Dict[str, str]: A dictionary with location names as keys and their IDs as values
+          only containing those that locations with the lowest edit distance to the pattern.
+        float: The lowest edit distance found.
+    """
+    editdist2location = {}
+    pattern = pattern.lower() # case insensitive matching
+    for location_name, _ in locations.items():
+        # we match substrings of the length of the pattern and use the smallest edit distance
+        # of any of those substrings
+        substring_length = min(len(pattern), len(location_name))
+        i = 0
+        min_distance = float('inf')
+        while i + substring_length < len(location_name):
+            sublocation = location_name[i:i + substring_length].lower()
+            distance = editdistance.eval(pattern, sublocation)
+            if distance < min_distance:
+                min_distance = distance
+            i += 1
+
+        if min_distance not in editdist2location:
+            editdist2location[min_distance] = []
+        editdist2location[min_distance].append(location_name)
+
+    min_distance = min(editdist2location.keys())
+    closest_locations = {name: locations[name] for name in editdist2location[min_distance]}
+    return closest_locations, min_distance
+
 
 if __name__ == "__main__":
     # # First print all location names

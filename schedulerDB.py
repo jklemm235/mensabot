@@ -8,15 +8,16 @@ DB_FILE = 'mensabot.db'
 def add_schedule_to_db(chat_id: str,
                        location_id: str,
                        time_str: str = "10:00",
-                       days_of_week: str = 'DAILY'):
+                       days_of_week: str = 'DAILY',
+                       day_to_report: str = 'today'):
     """Add a schedule to the database."""
     try:
         conn = create_connection(DB_FILE)
         cursor = conn.cursor()
         cursor.execute('''
-            INSERT INTO messages (chat_id, location_id, time, days_of_week)
-            VALUES (?, ?, ?, ?)
-        ''', (chat_id, location_id, time_str, days_of_week))
+            INSERT INTO messages (chat_id, location_id, time, days_of_week, day_to_report)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (chat_id, location_id, time_str, days_of_week, day_to_report))
         conn.commit()
     except sqlite3.Error as e:
         print(f"An error occurred while adding a schedule: {e}")
@@ -24,16 +25,15 @@ def add_schedule_to_db(chat_id: str,
     finally:
         cursor.close()
 
-def remove_schedule_from_db(chat_id: str, location_id: str,
-                            time_str: str, days_of_week: str):
+def remove_schedule_from_db(chat_id: str, row_id: int):
     """Remove a schedule from the database."""
     try:
         conn = create_connection(DB_FILE)
         cursor = conn.cursor()
         cursor.execute('''
             DELETE FROM messages
-            WHERE chat_id = ? AND location_id = ? AND time = ? AND days_of_week = ?
-        ''', (chat_id, location_id, time_str, days_of_week))
+            WHERE id = ? AND chat_id = ?
+        ''', (row_id, chat_id))
         conn.commit()
     except sqlite3.Error as e:
         print(f"An error occurred while removing a schedule: {e}")
@@ -41,8 +41,12 @@ def remove_schedule_from_db(chat_id: str, location_id: str,
     finally:
         cursor.close()
 
-def retrieve_schedules() -> Set[Tuple[str, str, str, str]]:
-    """Retrieve all schedules from the database."""
+def retrieve_schedules() -> Set[Tuple[str, str, str, str, str, str]]:
+    """Retrieve all schedules from the database.
+    Returns:
+        A set of tuples containing
+        chat_id, location_id, time, days_of_week, day_to_report, schedule_id
+    """
     try:
         conn = create_connection(DB_FILE)
         cursor = conn.cursor()
@@ -50,8 +54,8 @@ def retrieve_schedules() -> Set[Tuple[str, str, str, str]]:
         rows = cursor.fetchall()
         schedules = []
         for row in rows:
-            schedule = (row[1], row[2], row[3], row[4])
-              # chat_id, location_id, time, days_of_week
+            schedule = (row[1], row[2], row[3], row[4], row[5], row[0])
+              # chat_id, location_id, time, days_of_week, day_to_report, schedule_id
             schedules.append(schedule)  # Convert to frozenset for immutability
         return set(schedules)  # Return as a set for uniqueness
     except sqlite3.Error as e:
@@ -70,7 +74,8 @@ def create_table(conn: sqlite3.Connection):
                 chat_id TEXT NOT NULL,
                 location_id TEXT NOT NULL,
                 time TEXT DEFAULT '10:00',
-                days_of_week TEXT NOT NULL DEFAULT 'mon-fri'
+                days_of_week TEXT NOT NULL DEFAULT 'mon-fri',
+                day_to_report TEXT DEFAULT 'today'
             )
         ''')
         conn.commit()

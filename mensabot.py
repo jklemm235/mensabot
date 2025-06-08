@@ -26,17 +26,18 @@ def help_message(message) -> str:
         "Welcome to MensaBot! Here are the commands you can use:\n" +\
         "/help - Show this help message\n" +\
         "/locations - Get a list of Mensa locations and their ids\n" +\
-        "/food <location-id> [today|tomorrow] - Get the food menu for a given location. " +\
+        "/food - <location-id/name> [today|tomorrow]: Get the food menu for a given location. " +\
+        "If a name is provided, it will try to match the name to a location" +\
         "Timepoint defaults to 'today' if not specified.\n" +\
-        "/subscribe <location-id> <cron-days-of-week> <hh:mm> - Subscribe to receive daily food updates " +\
-        "for a specific location at a specific time. " +\
-        "cron-days-of-week is a string of the form 'mon-fri' or 'mon,tue,wed,thu,fri'...\n" +\
-        "/unsubscribe <location-id> <cron-days-of-week> <hh:mm> - Unsubscribe from daily food updates " +\
+        "/subscribe - <location-id> <cron-days-of-week> <hh:mm> <day_to_report: today/tomorrow> - "+\
+        "Subscribe to receive food updates " +\
+        "for a specific location at a specific day(s) for either the same day or the next day. " +\
+        "<cron-days-of-week> is a string of the form 'mon-fri' or 'mon,tue,wed,thu,fri'...\n" +\
+        "/unsubscribe <schedule_ids> - Unsubscribe from the food updates " +\
         "for a specific location at a specific time.\n" +\
-        "Note: The bot will send you messages at the specified time on the specified days of the week."
+        "/listsubs - List all your subscriptions.\n"
         # Add more commands as needed
     return help_text
-
 
 # --- Handler locations message ---
 def locations_message(message) -> str:
@@ -64,7 +65,7 @@ def locations_message(message) -> str:
 # --- Handler food message ---
 def food_message(message) -> str:
     """
-    Receives /food <location-id> [timepoint] and sends the menu.
+    Receives /food <location-id/name> [timepoint] and sends the menu.
     Timepoint defaults to 'today'.
     """
     split_message = message.split()
@@ -92,12 +93,27 @@ def food_message(message) -> str:
     location_name = location_id
     try:
         all_locations = scraper.get_all_location_names_and_ids(html.text)
+        found = False
         for key, value in all_locations.items():
             if value == location_id:
                 location_name = key
+                found = True
                 break
     except Exception as e:
         return f"Error extracting location names: {e}"
+
+    # If the location ID is not found, try to match it with a name
+    extra_location_string = ""
+    if not found:
+        closest_locations, min_distance = scraper.get_closest_locations_by_pattern(location_id, all_locations)
+        if len(closest_locations.keys()) == 0:
+            return f"Location {location_name} not found. No similar locations found."
+        if len(closest_locations.keys()) > 1:
+            return f"Location {location_name} not found. Did you mean one of these?\n" + \
+                    "\n".join([f"{name} ({id})" for name, id in closest_locations.items()])
+        extra_location_string = f" (edit distance of {min_distance} to given pattern {location_name}) "
+        location_name = list(closest_locations.keys())[0]  # Use the match
+        location_id = closest_locations[location_name]
 
     try:
         food_items = scraper.scrape_food_by_location(html.text, location_id)
@@ -105,10 +121,10 @@ def food_message(message) -> str:
         return f"Error extracting food items for location ID {location_id}: {e}"
 
     if not food_items:
-        return f"No food items found for location ID {location_id} on {timepoint_str}."
+        return f"No food items found for {location_name} ({location_id}){extra_location_string} on {timepoint_str}."
 
     # Format the food items into a message
-    food_message = f"Food items for {location_name} ({location_id}):\n"
+    food_message = f"Food items for {location_name} ({location_id}){extra_location_string}:\n"
     for item in food_items:
         food_message += f"- {item['name']} ({item['category']}): {item['prices']} on {item['date']}\n\n"
     # Send the message with the food items
@@ -126,7 +142,7 @@ def food_message(message) -> str:
             food_message += "\nP.S. Help, I couldn't find the Philturm location ID! "
             return food_message
 
-        food_message += "\nP.S. Simon, here's the vastly superior Philturm menu as well! 😉"
+        food_message += "\nP.S. Philturm:"
         try:
             philturm_food_items = scraper.scrape_food_by_location(html.text, philturm_location_id)
             food_message += f"\nFood items for {philturm_location_name} ({philturm_location_id}):\n"
@@ -148,7 +164,7 @@ def food_message(message) -> str:
             food_message += "\nP.S. Help, I couldn't find the Blattwerk location ID! "
             return food_message
 
-        food_message += "\nI quess the inferior Blattwerk menu is also requested?"
+        food_message += "\nP.S. Blattwerk:"
         try:
             blattwerk_food_items = scraper.scrape_food_by_location(html.text, blattwerk_location_id)
             food_message += f"\nFood items for {blattwerk_location_name} ({blattwerk_location_id}):\n"
@@ -157,8 +173,8 @@ def food_message(message) -> str:
         except Exception as e:
             food_message += f"Error extracting Blattwerk food items: {e}"
 
-    # with 10% probability, add a random Ole message
-    if random.random() <= 0.1:
+    # with 20% probability, add a random Ole message
+    if random.random() <= 0.2:
         food_message += "\n\n" + random.choice(OLE_MESSAGES)
 
     return food_message
@@ -166,27 +182,36 @@ def food_message(message) -> str:
 # --- subscribe message ---
 def handle_subscribe_message(message, scheduler_instance, chat_id, token) -> None:
     """
-    Receives /subscribe <location-id> <cron-days-of-week> <hh:mm> and schedules cron-days-of-week
-    times messages at hh:mm.
+    Receives /subscribe <location-id> <cron-days-of-week> <hh:mm> <day_to_report>
+    and schedules cron-days-of-week times messages at hh:mm.
     cron-days-of-week is a string of the form "mon-fri" or "mon,tue,wed,thu,fri"...
     """
     split_message = message.split()
-    if len(split_message) != 4:
+    if not(len(split_message) == 4 or len(split_message) == 5) or split_message[0] != "/subscribe":
         send_message(token=token,
                      chat_id=chat_id,
-                     text="Usage: /subscribe <location-id> <cron-days-of-week> <hh:mm> " +\
+                     text="Usage: /subscribe <location-id> <cron-days-of-week> <hh:mm> <day_to_report>" +\
                "E.g. /subscribe 176 mon-fri 10:00 " +\
                 "or /subscribe 176 mon,tue,wed,fri 10:00")
         return
 
     location_id = split_message[1]
+    day_to_report = "today"  # Default value
+    if len(split_message) > 4 and split_message[4].lower() in ["today", "tomorrow"]:
+        day_to_report = split_message[4].lower()
+    else:
+        send_message(token=token,
+                     chat_id=chat_id,
+                     text="Invalid day_to_report. Please use 'today' or 'tomorrow'.")
+        return
     try:
         sched.set_cron_like_job(scheduler_instance=scheduler_instance,
                                chat_id=chat_id,
                                location_id=location_id,
                                token=token,
                                time_str=split_message[3],
-                               days_of_week=split_message[2])
+                               days_of_week=split_message[2],
+                               day_to_report=day_to_report)
     except Exception as e:
         send_message(token, chat_id, f"Error setting up subscription: {e}")
         return
@@ -202,30 +227,36 @@ def handle_subscribe_message(message, scheduler_instance, chat_id, token) -> Non
     send_message(token=token,
                     chat_id=chat_id,
                     text=f"Subscribed to location {location_id} on {split_message[2]} at {split_message[3]}. " +\
-                        "You will receive food updates at that time.")
+                        f"You will receive food updates at that time for the {'same' if day_to_report == 'today' else 'next'} day.")
 
 def handle_unsubscribe_message(message, scheduler_instance, chat_id, token) -> BackgroundScheduler:
     """
-    Receives /unsubscribe <location-id> <cron-days-of-week> <hh:mm>
+    Receives /unsubscribe <schedule_id>
     and removes the subscription for that location.
     """
     split_message = message.split()
-    if len(split_message) != 4:
+    if len(split_message) < 2:
         send_message(token=token,
                      chat_id=chat_id,
-                     text="Usage: /unsubscribe <location-id> <cron-days-of-week> <hh:mm> " +\
-               "E.g. /unsubscribe 176 mon-fri 10:00 " +\
-                "or /unsubscribe 176 mon,tue,wed,fri 10:00")
+                     text="Usage: /unsubscribe <schedule_ids>. You can find your schedule_id by using /listsubs.")
         return scheduler_instance
 
-    # remove the job from the database
-    try:
-        schedDB.remove_schedule_from_db(chat_id=str(chat_id),
-                                       location_id=split_message[1],
-                                       time_str=split_message[3],
-                                       days_of_week=split_message[2])
-    except Exception as e:
-        send_message(token, chat_id, f"Error removing subscription from database: {e}")
+    # remove the job(s) from the database
+    removed_ids = []
+    for schedule_id in split_message[1:]:
+        try:
+            schedDB.remove_schedule_from_db(chat_id=str(chat_id),
+                                           row_id=int(schedule_id))
+        except Exception as e:
+            send_message(token, chat_id, f"Error removing job {schedule_id} from scheduler: {e}")
+            continue
+
+        removed_ids.append(schedule_id)
+
+    if not removed_ids or len(removed_ids) == 0:
+        send_message(token=token,
+                     chat_id=chat_id,
+                     text="No valid schedule IDs provided. Please use /listsubs to see your subscriptions.")
         return scheduler_instance
 
     # now we just restart the scheduler.  Not clean but works
@@ -233,8 +264,30 @@ def handle_unsubscribe_message(message, scheduler_instance, chat_id, token) -> B
     scheduler_instance = sched.startup_scheduler(token)  # Restart the scheduler
     send_message(token=token,
                  chat_id=chat_id,
-                 text=f"Unsubscribed from location {split_message[1]} on {split_message[2]} at {split_message[3]}.")
+                 text=f"Unsubscribed from schedule IDs: {', '.join(removed_ids)}. " +\
+                      "You will no longer receive food updates for these subscriptions.")
     return scheduler_instance
+
+def handle_list_subscriptions_message(message, token, chat_id) -> None:
+    """
+    Receives /listsubs and lists all subscriptions for the user.
+    """
+    try:
+        schedules = schedDB.retrieve_schedules()
+    except Exception as e:
+        send_message(token, chat_id, f"Error retrieving subscriptions: {e}")
+        return
+
+    if not schedules:
+        send_message(token, chat_id, "You have no active subscriptions.")
+        return
+
+    response = "Your active subscriptions:\n"
+    for schedule in schedules:
+        if schedule[0] == str(chat_id):  # Only show subscriptions for this user
+            response += f"Location ID: {schedule[1]}, Days: {schedule[3]}, Time: {schedule[2]}, Day To Report: {schedule[4]} Schedule_id: {schedule[5]}\n"
+
+    send_message(token, chat_id, response)
 
 # telegram library sucks so we just call the API directly
 def poll_updates(token: str, last_handled_id: Optional[int]) -> dict:
@@ -311,6 +364,8 @@ def main() -> None:
                     handle_subscribe_message(message_text, scheduler_instance, chat_id, BOT_TOKEN)
                 elif message_text.startswith("/unsubscribe"):
                     scheduler_instance = handle_unsubscribe_message(message_text, scheduler_instance, chat_id, BOT_TOKEN)
+                elif message_text.startswith("/listsubs"):
+                    handle_list_subscriptions_message(message_text, BOT_TOKEN, chat_id)
                 else:
                     response = "Unknown command. Please use /help to see available commands."
                     send_message(BOT_TOKEN, chat_id, response)
