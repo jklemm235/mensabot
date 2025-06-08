@@ -154,9 +154,10 @@ def get_closest_locations_by_pattern(pattern: str, locations: Dict[str, str]) ->
         # we match substrings of the length of the pattern and use the smallest edit distance
         # of any of those substrings
         substring_length = min(len(pattern), len(location_name))
+        max_length = max(len(pattern), len(location_name))
         i = 0
         min_distance = float('inf')
-        while i + substring_length < len(location_name):
+        while i + substring_length <= max_length:
             sublocation = location_name[i:i + substring_length].lower()
             distance = editdistance.eval(pattern, sublocation)
             if distance < min_distance:
@@ -169,6 +170,7 @@ def get_closest_locations_by_pattern(pattern: str, locations: Dict[str, str]) ->
 
     min_distance = min(editdist2location.keys())
     closest_locations = {name: locations[name] for name in editdist2location[min_distance]}
+    print(editdist2location)
     return closest_locations, min_distance
 
 
