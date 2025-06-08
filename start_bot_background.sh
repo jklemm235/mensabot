@@ -1,4 +1,16 @@
 #!/bin/sh
+# install requirements
+if [ ! -f requirements.txt ]; then
+    echo "requirements.txt not found, please ensure you are in the correct directory."
+    exit 1
+fi
+if ! command -v python3 &> /dev/null
+then
+    echo "python3 could not be found, please install Python3."
+    exit 1
+fi
+
+python3 -m pip install -r requirements.txt
 
 # check if tmux is installed
 if ! command -v tmux &> /dev/null
