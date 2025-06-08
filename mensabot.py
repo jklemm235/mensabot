@@ -19,25 +19,23 @@ OLE_MESSAGES = [
     "I think Ole might actually not be working on Otel :("
 ]
 
+COMMANDS = {
+    "help": "Show this help message",
+    "locations": "Get a list of Mensa locations and their ids",
+    "food": "<location-id/name> [today|tomorrow]: Get the food menu for a given location. " +
+             "If a name is provided, it will try to match the name to a location. " +
+             "Timepoint defaults to 'today' if not specified.",
+    "subscribe": "<location-id> <cron-days> <hh:mm> <day_to_report: today/tomorrow> - " +
+                  "Subscribe to receive food updates for a specific location at specific day(s) for either the same day or the next day. " +
+                  "<cron-days> is a string of the form 'mon-fri' or 'sun,tue'",
+    "unsubscribe": "<schedule_ids> - Unsubscribe from the food updates for a specific location at a specific time.",
+    "listsubs": "List all your subscriptions."
+}
+
 # # --- Handler help message ---
 def help_message(message) -> str:
     """Sends a message with information about the bot."""
-    help_text = \
-        "Welcome to MensaBot! Here are the commands you can use:\n" +\
-        "/help - Show this help message\n" +\
-        "/locations - Get a list of Mensa locations and their ids\n" +\
-        "/food - <location-id/name> [today|tomorrow]: Get the food menu for a given location. " +\
-        "If a name is provided, it will try to match the name to a location" +\
-        "Timepoint defaults to 'today' if not specified.\n" +\
-        "/subscribe - <location-id> <cron-days-of-week> <hh:mm> <day_to_report: today/tomorrow> - "+\
-        "Subscribe to receive food updates " +\
-        "for a specific location at a specific day(s) for either the same day or the next day. " +\
-        "<cron-days-of-week> is a string of the form 'mon-fri' or 'mon,tue,wed,thu,fri'...\n" +\
-        "/unsubscribe <schedule_ids> - Unsubscribe from the food updates " +\
-        "for a specific location at a specific time.\n" +\
-        "/listsubs - List all your subscriptions.\n"
-        # Add more commands as needed
-    return help_text
+    return "\n".join([f"/{cmd}: {desc}" for cmd, desc in COMMANDS.items()])
 
 # --- Handler locations message ---
 def locations_message(message) -> str:
@@ -310,7 +308,19 @@ def send_message(token: str, chat_id: int, text: str) -> None:
     if response.status_code != 200:
         raise Exception(f"Failed to send message: {response.text}")
 
-
+def report_commands(token: str) -> None:
+    """Reports the available commands to the telegram API."""
+    url = f"https://api.telegram.org/bot{token}/setMyCommands"
+    payload = [{"command": cmd, "description": desc} for cmd, desc in COMMANDS.items()]
+    for cmd, desc in COMMANDS.items():
+        if len(desc) > 255:
+            print(f"Warning: Description for command '{cmd}' is too long: {len(desc)} characters. Max is 255.")
+            raise ValueError(f"Description for command '{cmd}' is too long: {len(desc)} characters. Max is 255.")
+    response = requests.post(url, json={"commands": payload})
+    if response.status_code != 200:
+        raise Exception(f"Failed to set commands: {response.text}")
+    print("Commands reported successfully to Telegram API.")
+    print(response.text)
 
 # --- Main function to set up and run the bot ---
 def main() -> None:
@@ -320,6 +330,7 @@ def main() -> None:
         raise ValueError("Please set your bot token in the MENSABOT_TOKEN environment variable.")
     last_handled_id = None
 
+    report_commands(BOT_TOKEN)  # Report the available commands to the Telegram API
     scheduler_instance = sched.startup_scheduler(BOT_TOKEN)  # Start the scheduler
     while True:
         time.sleep(10)
