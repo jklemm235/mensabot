@@ -1,0 +1,11 @@
+version: "3.8"
+
+services:
+  mensabot:
+    build: .
+    container_name: mensabot
+    environment:
+      - MENSABOT_TOKEN=${MENSABOT_TOKEN}
+    volumes:
+      - ./mensabot.db:/app/mensabot.db
+    restart: unless-stopped
