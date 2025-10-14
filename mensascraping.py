@@ -1,3 +1,5 @@
+# pylint: disable=broad-except
+# pyright: reportGeneralTypeIssues=false
 from typing import Dict, List, Tuple
 from bs4 import BeautifulSoup
 import requests
@@ -14,6 +16,7 @@ RELEVANT_PRICE_TYPES = [
     "Bedienstete",
     "Gäste",
 ]
+TIMEOUT = 60  # Timeout for HTTP requests in seconds
 
 def scrape_food_by_location(html_content: str, target_location_id: str) -> List[dict]:
     """
@@ -40,31 +43,31 @@ def scrape_food_by_location(html_content: str, target_location_id: str) -> List[
         return food_data
 
     # Find all timestamp wrappers within the location (assuming food is timestamped)
-    timestamp_wrappers = location_wrapper.find_all('div', class_='tx-epwerkmenu-menu-timestamp-wrapper')
+    timestamp_wrappers = location_wrapper.find_all('div', class_='tx-epwerkmenu-menu-timestamp-wrapper')  # type: ignore
 
     for timestamp_wrapper in timestamp_wrappers:
         # Find all category wrappers within the timestamp
-        category_wrappers = timestamp_wrapper.find_all('div', class_='menulist__categorywrapper')
+        category_wrappers = timestamp_wrapper.find_all('div', class_='menulist__categorywrapper')  # type: ignore
 
         # also get the date from the timestamp wrapper
-        date_tag = timestamp_wrapper.get('data-timestamp')
+        date_tag = timestamp_wrapper.get('data-timestamp')  # type: ignore
 
         for category_wrapper in category_wrappers:
-            category_title_tag = category_wrapper.find('h5', class_='menulist__categorytitle')
+            category_title_tag = category_wrapper.find('h5', class_='menulist__categorytitle')  # type: ignore
             category_title = category_title_tag.get_text(strip=True) if category_title_tag else "Uncategorized"
 
             # Find all meal tiles within the category
-            meal_tiles = category_wrapper.find_all('div', class_='menue-tile')
+            meal_tiles = category_wrapper.find_all('div', class_='menue-tile')  # type: ignore
 
             for meal_tile in meal_tiles:
-                meal_name_tag = meal_tile.find('h5', class_='singlemeal__headline')
+                meal_name_tag = meal_tile.find('h5', class_='singlemeal__headline')  # type: ignore
                 meal_name = meal_name_tag.get_text(strip=True) if meal_name_tag else "Unknown Meal"
 
                 prices = {}
                 # Prices are as spans with singlemeal__info class for the type of price
                 # (Studierende, Bedienstete, Gäste)
                 # and the price as a span with singlemeal__info--semibold class
-                potential_price_spans = meal_tile.find_all('span', class_='singlemeal__info')
+                potential_price_spans = meal_tile.find_all('span', class_='singlemeal__info')  # type: ignore
                 for potential_price_span in potential_price_spans:
                     price_type = potential_price_span.get_text(strip=True)
                     for relevant_price_type in RELEVANT_PRICE_TYPES:
@@ -106,12 +109,12 @@ def get_all_location_names_and_ids(html_content: str) -> Dict[str, str]:
     relevant_lis = soup.find_all('li', class_='mselect__option')
     for li in relevant_lis:
         # id is in li data-id attribute
-        location_id = li.get('data-id')
+        loc_id = li.get('data-id')  # type: ignore
         # text is the inner text of the li
         location_name = li.get_text(strip=True)
-        for_contains_building = True if li.get('for') and li.get('for').startswith("building-id-") else False
-        if location_name and location_id and for_contains_building:
-            location_names[location_name] = location_id
+        for_contains_building = True if li.get('for') and li.get('for').startswith("building-id-") else False  # type: ignore
+        if location_name and loc_id and for_contains_building:
+            location_names[location_name] = loc_id
     return location_names
 
 
@@ -126,11 +129,11 @@ def get_html_by_day(t_query_param="today") -> requests.Response:
         url += f"?t={t_query_param}"
     else:
         raise ValueError(f"Invalid query parameter: {t_query_param}")
-    response = requests.get(url)
+    response = requests.get(url, timeout=TIMEOUT)
     if response.status_code == 200:
         return response
-    else:
-        raise Exception(f"Failed to fetch data from {url}, status code: {response.status_code}")
+
+    raise Exception(f"Failed to fetch data from {url}, status code: {response.status_code}")  # pyright: ignore
 
 
 def get_closest_locations_by_pattern(pattern: str, locations: Dict[str, str]) -> \

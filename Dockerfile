@@ -6,7 +6,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
-RUN rm -f mensabot.db
+RUN rm -f db/mensabot.db
     # Should be either created fresh or mounted from the host
 
 CMD ["python", "mensabot.py"]

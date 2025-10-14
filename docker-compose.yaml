@@ -6,6 +6,10 @@ services:
     container_name: mensabot
     environment:
       - MENSABOT_TOKEN=${MENSABOT_TOKEN}
+      - TZ=Europe/Berlin
     volumes:
-      - ./mensabot.db:/app/mensabot.db
+      - mensabot_data:/app/db
     restart: unless-stopped
+
+volumes:
+  mensabot_data:
