@@ -233,25 +233,31 @@ class TelegramBotAdmin:
         url = f"{self.base_url}/sendMessage"
         payload = {
             "chat_id": chat_id,
-            "text": text,
             "disable_notification": disable_notification
         }
+
+        # max 4096 characters per message, just to be sure we use 4095 in case theres weird stuff
+        # happening
+        texts = [text[i:i + 4095] for i in range(0, len(text), 4095)]
 
         if reply_markup:
             payload["reply_markup"] = reply_markup
         if parse_mode:
             payload["parse_mode"] = parse_mode
 
-        try:
-            print(f"Sending message to chat {chat_id}: {text}")
-            response = requests.post(url, json=payload)
-            if response.status_code != 200:
-                print(f"Failed to send message: {response.text}")
+
+        for text in texts:
+            payload["text"] = text
+            try:
+                print(f"Sending message to chat {chat_id}: {text}")
+                response = requests.post(url, json=payload)
+                if response.status_code != 200:
+                    print(f"Failed to send message: {response.text}")
+                    return False
+                return True
+            except Exception as e:
+                print(f"Error sending message: {e}")
                 return False
-            return True
-        except Exception as e:
-            print(f"Error sending message: {e}")
-            return False
 
     def _handle_help(self, message_text: str, chat_id: int, **kwargs) -> str:
         """
