@@ -58,6 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     if: github.event_name != 'pull_request'
+    environment: CICD
 
     steps:
       - name: Download image artifact
