@@ -93,7 +93,6 @@ def food_message(message) -> str:
         if len(closest_locations.keys()) > 1:
             return f"Location {location_name} not found. Did you mean one of these?\n" + \
                     "\n".join([f"{name} ({id})" for name, id in closest_locations.items()])
-        extra_location_string = f" (edit distance of {min_distance} to given pattern {location_name}) "
         location_name = list(closest_locations.keys())[0]  # Use the match
         location_id = closest_locations[location_name]
 
