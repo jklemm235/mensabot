@@ -8,13 +8,17 @@ import mensascraping as scraper
 from scheduler import Scheduler
 from telegram_bot_admin import TelegramBotAdmin
 
-OLE_MESSAGES = [
-    "How is Otel going Ole?",
-    "Ole, are you still working on Otel?",
-    "Ole, I hope you're not too busy with Otel to enjoy some Mensa food!",
-    "Ole, remember to take breaks and enjoy some Mensa food while working on Otel!",
-    "Sometimes I dream about Otel",
-    "I think Ole might actually not be working on Otel :("
+RANDOM_MESSAGE_TO_ADD = [
+    "Seagulls can drink saltwater as they have special salt glands, allowing them to cry out salty tears, saltier than the ocean itself!",
+    "Honey never spoils (if stored correctly)",
+    "Octopuses have three hearts and blue blood. Two hearts pump blood to the gills, while the third pumps it to the rest of the body!",
+    "Octopuses have small brains in each of their eight arms, allowing them to taste and touch with their limbs independently! They truely life the federated lifestyle.",
+    "Wombat poop is cube-shaped! This unique shape helps prevent the poop from rolling away, marking their territory effectively.",
+    "A group of flamingos is called a 'flamboyance'.",
+    "Sharks have been around longer than trees! They have existed for over 400 million years, while the first trees appeared around 350 million years ago.",
+    "Sharks have survived all five major mass extinction events in Earth's history. This is because they are so god damn smooth",
+    "The biggest organism on Earth is a fungus! It covers an area of nearly 10 square kilometers and is called humongous fungus.",
+    "Philturm is vastly superior to Blattwerk in every way imaginable. It's a true fact.",
 ]
 
 # --- Handler locations message ---
@@ -151,9 +155,9 @@ def food_message(message) -> str:
         except Exception as e:
             food_msg += f"Error extracting Blattwerk food items: {e}"
 
-    # with 20% probability, add a random Ole message
-    if random.random() <= 0.2:
-        food_msg += "\n\n" + random.choice(OLE_MESSAGES)
+    # with 10% probability, add a random message
+    if random.random() <= 0.1:
+        food_msg += "\n\n" + random.choice(RANDOM_MESSAGE_TO_ADD)
 
     return food_msg
 
